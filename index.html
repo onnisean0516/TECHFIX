@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TechFix - Device Troubleshooting</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --text: #0f172a; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 2rem; max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 1rem; }
+        h1 { color: var(--primary); text-align: center; }
+        .form-group { margin-bottom: 1rem; }
+        select, input, button { width: 100%; padding: 0.75rem; margin-top: 0.5rem; border: 1px solid #cbd5e1; border-radius: 4px; }
+        button { background: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background: #1d4ed8; }
+        .hidden { display: none; }
+        .step-list { list-style-type: decimal; margin-left: 1.5rem; }
+        .step-item { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+
+    <h1>TechFix</h1>
+
+    <div id="selection-screen" class="card">
+        <h2>Find a Fix</h2>
+        <div class="form-group">
+            <label>Device Type</label>
+            <select id="device-select">
+                <option value="Laptop">Laptop</option>
+                <option value="Phone">Phone</option>
+                <option value="Tablet">Tablet</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Operating System</label>
+            <select id="os-select">
+                <option value="Windows">Windows</option>
+                <option value="Android">Android</option>
+                <option value="macOS">macOS</option>
+                <option value="Linux">Linux</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Problem Keyword</label>
+            <input type="text" id="problem-search" placeholder="e.g., App keeps crashing">
+        </div>
+        <button onclick="searchProblems()">Search Problems</button>
+    </div>
+
+    <div id="troubleshooting-screen" class="card hidden">
+        <h2 id="problem-title">Problem Details</h2>
+        <ol id="steps-container" class="step-list">
+            </ol>
+        <button onclick="markAsSolved()">Mark as Solved & Save History</button>
+        <button onclick="resetUI()" style="background: #64748b; margin-top: 10px;">Back to Search</button>
+    </div>
+
+    <script>
+        let currentProblemId = "";
+
+        // Send AJAX request to the C++ backend
+        async function searchProblems() {
+            const device = document.getElementById('device-select').value;
+            const os = document.getElementById('os-select').value;
+            const query = document.getElementById('problem-search').value;
+
+            try {
+                // The C++ server will listen on localhost:8080
+                const response = await fetch(`http://localhost:8080/api/problems?device=${device}&os=${os}&q=${query}`);
+                const data = await response.json();
+                
+                if(data.steps) {
+                    displaySteps(data);
+                } else {
+                    alert("No matching problems found.");
+                }
+            } catch (error) {
+                console.error("Error connecting to backend:", error);
+                alert("Could not connect to the C++ backend.");
+            }
+        }
+
+        function displaySteps(data) {
+            document.getElementById('selection-screen').classList.add('hidden');
+            document.getElementById('troubleshooting-screen').classList.remove('hidden');
+            
+            document.getElementById('problem-title').innerText = data.title;
+            currentProblemId = data.title;
+
+            const container = document.getElementById('steps-container');
+            container.innerHTML = ""; 
+            
+            data.steps.forEach(step => {
+                const li = document.createElement('li');
+                li.className = 'step-item';
+                li.innerText = step;
+                container.appendChild(li);
+            });
+        }
+
+        async function markAsSolved() {
+            const payload = { problem: currentProblemId, status: "solved", timestamp: new Date().toISOString() };
+            
+            await fetch('http://localhost:8080/api/history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            
+            alert("History saved successfully!");
+            resetUI();
+        }
+
+        function resetUI() {
+            document.getElementById('troubleshooting-screen').classList.add('hidden');
+            document.getElementById('selection-screen').classList.remove('hidden');
+            document.getElementById('problem-search').value = "";
+        }
+    </script>
+</body>
+</html>
